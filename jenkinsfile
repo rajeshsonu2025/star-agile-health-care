@@ -1,0 +1,55 @@
+pipeline {
+    agent any
+
+    environment {    
+        DOCKERHUB_CREDENTIALS = credentials('dockerhubpwd')
+        KUBECONFIG = credentials('kube-config')
+    }
+
+    stages {
+        stage('SCM Checkout') {
+            steps {
+                echo 'Perform SCM Checkout'
+                git 'https://github.com/rajeshsonu2025/star-agile-health-care.git/'
+            }
+        }
+
+        stage('Application Build') {
+            steps {
+                echo 'Perform Application Build'
+                sh 'mvn clean package'
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                echo 'Perform Docker Build'
+                sh "docker build -t rajeshyadavhub/healthcare-eta-app:${BUILD_NUMBER} ."
+                sh "docker tag rajeshyadavhub/healthcare-eta-app:${BUILD_NUMBER} rajeshyadavhub/healthcare-eta-app:latest"
+                sh 'docker image list'
+            }
+        }
+
+        stage('Login to DockerHub') {
+            steps {
+                echo 'Login to DockerHub'
+                sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+            }
+        }
+
+        stage('Publish Image to DockerHub') {
+            steps {
+                echo 'Publish to DockerHub'
+                sh "docker push rajeshyadavhub/healthcare-eta-app:${BUILD_NUMBER}"
+                sh "docker push rajeshyadavhub/healthcare-eta-app:latest"
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                echo 'Deploying to Kubernetes...'
+                sh 'kubectl apply -f kuberenetesdeploy.yaml'
+            }
+        }
+    }
+}
